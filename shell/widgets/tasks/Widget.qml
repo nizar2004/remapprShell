@@ -123,12 +123,14 @@ BarWidget {
     readonly property var noItem: ({ key: "", appName: "", windows: [], active: false, attention: false,
                                      attentionSince: 0, iconName: "", iconFile: "" })
 
-    // As tall as the design's buttons at this thickness. With titles a
-    // button is as wide as its title needs, up to `maxWidth`; without, it is
-    // the icon and its padding.
+    // The button's cross-panel size. Along the panel, titles can widen a
+    // horizontal button; a side panel keeps square, icon-only buttons.
     readonly property int buttonHeight: Math.max(22, Math.round(48 * root.unit))
     readonly property int padding: Math.round((root.showTitles ? 16 : 12) * Math.max(0.7, root.unit))
     readonly property int spacing: Math.max(2, Math.round(6 * root.unit))
+    readonly property real verticalButtonLength: root.room >= 0
+        ? Math.min(root.buttonHeight, Math.max(root.drawnIconOnly, root.wanted))
+        : root.buttonHeight
 
     // When the row would not fit the room the panel has for it, every
     // button is cut to an equal share of it -- titles elided first, then gone
@@ -158,18 +160,16 @@ BarWidget {
         : Math.max(2, Math.round(root.padding * root.squeeze * 0.6))
     readonly property real drawnIconOnly: root.drawnIcon + 2 * root.drawnPadding
     readonly property real titleRoom: Math.min(root.maxWidth, root.share) - root.iconOnly - Math.round(10 * Math.max(0.7, root.unit))
-    readonly property bool titlesFit: root.showTitles && root.titleRoom >= 28
+    readonly property bool titlesFit: !root.barVertical && root.showTitles && root.titleRoom >= 28
 
-    // Buttons differ in width once they carry titles, so the one under the
-    // pointer is found by where each actually is (BarWidget.indexAlong)
-    // rather than by dividing the position by one width. The taskbar runs
-    // along the panel only.
+    // Buttons differ in length once horizontal titles are shown, so find the
+    // one under the pointer from its actual position along the panel.
     function indexAt(position) {
-        return root.indexAlong(buttons, position, root.spacing, false);
+        return root.indexAlong(buttons, position, root.spacing, root.barVertical);
     }
 
     function centreOf(index) {
-        return Math.max(0, root.centreAlong(buttons, index, false));
+        return Math.max(0, root.centreAlong(buttons, index, root.barVertical));
     }
 
     // The preview's cards carry their own inner margin, so the card around
@@ -189,7 +189,9 @@ BarWidget {
     // (BarWidget.popoutTail). The menu is a menu, and stands clear as the
     // others do.
     popoutTail: root.popoutMode !== "menu"
-    popoutTailWidth: buttons.itemAt(root.items.findIndex(i => i.key === root.previewKey))?.width ?? root.drawnIconOnly
+    popoutTailWidth: root.barVertical
+        ? buttons.itemAt(root.items.findIndex(i => i.key === root.previewKey))?.height ?? root.verticalButtonLength
+        : buttons.itemAt(root.items.findIndex(i => i.key === root.previewKey))?.width ?? root.drawnIconOnly
 
     // Which button the pointer is over, or -1. The panel reports the position
     // along the widget; turning that into an index is arithmetic rather than a
@@ -290,8 +292,12 @@ BarWidget {
     // settling to a steady tint.
     readonly property int flashMs: 6000
 
-    implicitWidth: root.room >= 0 ? Math.min(row.implicitWidth, root.room) : row.implicitWidth
-    implicitHeight: root.barThickness
+    implicitWidth: root.barVertical
+        ? root.barThickness
+        : root.room >= 0 ? Math.min(layout.implicitWidth, root.room) : layout.implicitWidth
+    implicitHeight: root.barVertical
+        ? root.room >= 0 ? Math.min(layout.implicitHeight, root.room) : layout.implicitHeight
+        : root.barThickness
 
     function handleHover(position, horizontal) {
         root.hoveredIndex = root.indexAt(position);
@@ -368,15 +374,23 @@ BarWidget {
         root.requestPopout("tasks", root.centreOf(root.items.indexOf(item)));
     }
 
-    Row {
-        id: row
-        anchors.verticalCenter: parent.verticalCenter
+    Grid {
+        id: layout
+        anchors.verticalCenter: root.barVertical ? undefined : parent.verticalCenter
+        anchors.horizontalCenter: root.barVertical ? parent.horizontalCenter : undefined
+        columns: root.barVertical ? 1 : Math.max(1, root.items.length)
+        verticalItemAlignment: root.barVertical ? Grid.AlignTop : Grid.AlignVCenter
+        horizontalItemAlignment: root.barVertical ? Grid.AlignHCenter : Grid.AlignLeft
         spacing: root.spacing
-        // The last line of defence: with the buttons already at their floor
-        // the row is still wider than the zone, and what is left over is cut
-        // rather than drawn over the neighbours.
+        // Keep an overfull task list inside its zone rather than letting it
+        // cover the widgets beside it.
         clip: true
-        width: root.room >= 0 ? Math.min(row.implicitWidth, root.room) : row.implicitWidth
+        width: root.barVertical
+            ? layout.implicitWidth
+            : root.room >= 0 ? Math.min(layout.implicitWidth, root.room) : layout.implicitWidth
+        height: root.barVertical
+            ? root.room >= 0 ? Math.min(layout.implicitHeight, root.room) : layout.implicitHeight
+            : layout.implicitHeight
 
         Repeater {
             id: buttons

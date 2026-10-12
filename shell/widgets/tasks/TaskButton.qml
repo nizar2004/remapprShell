@@ -34,10 +34,14 @@ Rectangle {
     readonly property bool isHovered: button.index === button.taskbar.hoveredIndex
     readonly property int windowCount: button.item.windows.length
 
-    width: button.taskbar.titlesFit
-        ? Math.min(button.taskbar.maxWidth, button.taskbar.share, content.implicitWidth + 2 * button.taskbar.padding)
-        : button.taskbar.drawnIconOnly
-    height: button.taskbar.buttonHeight
+    width: button.taskbar.barVertical
+        ? button.taskbar.buttonHeight
+        : button.taskbar.titlesFit
+            ? Math.min(button.taskbar.maxWidth, button.taskbar.share, content.implicitWidth + 2 * button.taskbar.padding)
+            : button.taskbar.drawnIconOnly
+    height: button.taskbar.barVertical
+        ? button.taskbar.verticalButtonLength
+        : button.taskbar.buttonHeight
     radius: Math.round(14 * Math.max(0.7, button.taskbar.unit))
 
     // Buttons sit on the panel itself, as the design draws them: no tile until
@@ -151,9 +155,16 @@ Rectangle {
     // for the focused one, a short mark per other window. Colour alone is the
     // distinction a person with low vision may not see at all, so the count is
     // shape as well as tint.
-    Row {
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: parent.height + Math.max(1, Math.round((button.taskbar.barThickness - button.taskbar.buttonHeight) / 2 - 7))
+    Grid {
+        anchors.horizontalCenter: button.taskbar.barVertical ? undefined : parent.horizontalCenter
+        anchors.verticalCenter: button.taskbar.barVertical ? parent.verticalCenter : undefined
+        x: button.taskbar.barVertical
+            ? parent.width + Math.max(1, Math.round((button.taskbar.barThickness - button.taskbar.buttonHeight) / 2 - 7))
+            : 0
+        y: button.taskbar.barVertical
+            ? 0
+            : parent.height + Math.max(1, Math.round((button.taskbar.barThickness - button.taskbar.buttonHeight) / 2 - 7))
+        columns: button.taskbar.barVertical ? 1 : Math.max(1, Math.min(4, button.windowCount))
         spacing: 3
 
         Repeater {
@@ -163,9 +174,13 @@ Rectangle {
             Rectangle {
                 required property int index
 
-                width: button.isActive && index === 0 ? Math.round(22 * Math.max(0.7, button.taskbar.unit))
+                width: button.taskbar.barVertical ? 3
+                    : button.isActive && index === 0 ? Math.round(22 * Math.max(0.7, button.taskbar.unit))
                                                      : Math.round(6 * Math.max(0.7, button.taskbar.unit))
-                height: 3
+                height: button.taskbar.barVertical
+                    ? button.isActive && index === 0 ? Math.round(22 * Math.max(0.7, button.taskbar.unit))
+                                                     : Math.round(6 * Math.max(0.7, button.taskbar.unit))
+                    : 3
                 radius: 1.5
                 color: button.isActive && index === 0 ? Theme.acc : Theme.alpha(Theme.fg, 0.4)
             }
